@@ -1,0 +1,421 @@
+<!--
+ Copyright 2026 Google LLC
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+ https://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GenMedia Live</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' }</script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Söhne:wght@300;400;500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: #fff;
+  color: #0d0d0d;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── NAV ── */
+nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px; height: 54px; border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+.nav-title { font-size: 14px; font-weight: 600; color: #0d0d0d; }
+.nav-sub { font-size: 12px; color: #aaa; margin-top: 1px; }
+.theme-btn {
+  width: 34px; height: 34px; border-radius: 8px; border: none;
+  background: transparent; cursor: pointer; display: flex;
+  align-items: center; justify-content: center; color: #888;
+  transition: background .15s;
+}
+.theme-btn:hover { background: #f5f5f5; }
+
+/* ── MAIN ── */
+.auth-main {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 24px 16px; overflow-y: auto; background: #fafafa;
+  min-height: calc(100vh - 100px);
+}
+
+/* ── CARD ── */
+.card {
+  width: 100%; max-width: 440px;
+  background: #fff; border: 1px solid #e8e8e8;
+  border-radius: 16px; overflow: hidden;
+  box-shadow: 0 2px 16px rgba(0,0,0,.06);
+}
+
+/* ── SECTIONS ── */
+.auth-section { padding: 20px 24px; }
+.auth-section + .auth-section { border-top: 1px solid #f2f2f2; }
+
+.section-label {
+  font-size: 11px; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: #bbb; margin-bottom: 14px;
+}
+
+/* ── FIELDS ── */
+.field { margin-bottom: 12px; }
+.field:last-child { margin-bottom: 0; }
+.field label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 500; color: #555; margin-bottom: 6px;
+}
+.step {
+  width: 17px; height: 17px; border-radius: 50%; background: #0d0d0d;
+  color: #fff; font-size: 9px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.field input, .field select, .field textarea {
+  width: 100%; padding: 9px 12px; font-size: 13px;
+  border: 1px solid #e8e8e8; border-radius: 10px;
+  background: #fff; color: #0d0d0d; outline: none;
+  font-family: inherit; transition: border-color .15s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: #ccc;
+}
+.field input::placeholder, .field textarea::placeholder { color: #c0c0c0; }
+.field textarea { resize: none; }
+.field code {
+  font-size: 11px; background: #f5f5f5; padding: 2px 6px;
+  border-radius: 4px; font-family: 'SF Mono', monospace; color: #555;
+}
+.hint { font-size: 11px; color: #bbb; margin-top: 6px; }
+
+/* ── BUTTONS ── */
+.auth-btn {
+  width: 100%; padding: 10px; border-radius: 10px; border: none;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  font-family: inherit; transition: all .15s;
+}
+.btn-dark { background: #0d0d0d; color: #fff; }
+.btn-dark:hover { background: #2a2a2a; }
+.btn-dark:disabled { background: #888; cursor: not-allowed; }
+.btn-light { background: #f5f5f5; color: #333; }
+.btn-light:hover { background: #ececec; }
+
+/* ── STATUS ── */
+#validation-status {
+  font-size: 12px; min-height: 32px; padding: 8px 10px;
+  background: #fafafa; border: 1px solid #f0f0f0; border-radius: 8px;
+  display: flex; align-items: center; color: #888;
+  margin-bottom: 12px;
+}
+.ok { color: #16a34a !important; }
+.err { color: #dc2626 !important; }
+.info { color: #2563eb !important; }
+.warn { color: #d97706 !important; }
+
+/* ── FOOTER ── */
+footer.auth-footer {
+  text-align: center; padding: 14px;
+  font-size: 11px; color: #ccc; flex-shrink: 0;
+  border-top: 1px solid #f5f5f5; background: #fff;
+}
+    </style>
+</head>
+<body>
+
+    <div class="screen active" id="screen-auth" style="overflow-y: auto; height: 100vh; display: flex; flex-direction: column;">
+        
+        <nav>
+          <div>
+            <div class="nav-title">GenMedia Live</div>
+          </div>
+          <button class="theme-btn" id="theme-btn" title="Toggle theme">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+            </svg>
+          </button>
+        </nav>
+
+        <main class="auth-main">
+          <div class="card">
+
+            <!-- AUTH -->
+            <div class="auth-section">
+              <div class="section-label">Authentication</div>
+
+              <div class="field">
+                <label><span class="step">1</span> Google Cloud Project ID</label>
+                <input type="text" id="project-id-input" placeholder="my-project-id" autocomplete="off"/>
+              </div>
+
+              <div class="field">
+                <label>Region</label>
+                <select id="location-input">
+                  <option value="us-central1">us-central1</option>
+                  <option value="us-east1">us-east1</option>
+                  <option value="us-east4">us-east4</option>
+                  <option value="us-west1">us-west1</option>
+                  <option value="us-west4">us-west4</option>
+                  <option value="europe-west1">europe-west1</option>
+                  <option value="europe-west2">europe-west2</option>
+                  <option value="europe-west3">europe-west3</option>
+                  <option value="europe-west4">europe-west4</option>
+                  <option value="asia-east1">asia-east1</option>
+                  <option value="asia-northeast1">asia-northeast1</option>
+                  <option value="asia-southeast1">asia-southeast1</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label><span class="step">2</span> Get Access Token</label>
+                <button class="auth-btn btn-light" id="get-token-btn">Open Cloud Shell</button>
+                <p class="hint">Run <code onclick="copyToClipboard('gcloud auth print-access-token')" title="Click to copy" style="cursor: pointer;">gcloud auth print-access-token</code> in the terminal</p>
+              </div>
+
+              <div class="field">
+                <label><span class="step">3</span> Paste Token</label>
+                <input type="password" id="access-token-input" placeholder="Paste token here" autocomplete="off"/>
+              </div>
+
+              <div id="validation-status">Waiting for credentials…</div>
+
+              <button class="auth-btn btn-dark" id="validate-token-btn">Validate &amp; Connect</button>
+            </div>
+
+          </div>
+        </main>
+
+        <footer class="auth-footer">Built for the Gemini Live API Challenge 🗣️</footer>
+    </div>
+    
+    <div id="main-content" style="display: contents;"></div>
+
+    <div id="notification-toast"></div>
+
+    <script type="module" src="/src/main.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const validateBtn = document.getElementById('validate-token-btn');
+            const getTokenBtn = document.getElementById('get-token-btn');
+            const saveInstructionsBtn = document.getElementById('save-instructions-btn');
+            const statusElement = document.getElementById('validation-status');
+            const projectIdInput = document.getElementById('project-id-input');
+
+            getTokenBtn?.addEventListener('click', () => {
+                const projectId = projectIdInput.value.trim();
+                if (!projectId) {
+                    statusElement.innerHTML = 'Enter Project ID first';
+                    statusElement.className = 'warn';
+                    projectIdInput.focus();
+                    return;
+                }
+                const cloudShellUrl = `https://console.cloud.google.com/cloudshell/editor?project=${projectId}&shellonly=true&show=terminal`;
+                statusElement.innerHTML = 'Cloud Shell opening...';
+                statusElement.className = 'info';
+                window.open(cloudShellUrl, '_blank', 'noopener,noreferrer');
+            });
+
+            validateBtn?.addEventListener('click', async () => {
+                const projectId = projectIdInput.value.trim();
+                const location = document.getElementById('location-input').value.trim();
+                const accessToken = document.getElementById('access-token-input').value.trim();
+                
+                if (!projectId) {
+                    statusElement.innerHTML = 'Enter Project ID first';
+                    statusElement.className = 'err';
+                    projectIdInput.focus();
+                    return;
+                }
+                
+                if (!accessToken) {
+                    statusElement.innerHTML = 'Access token required';
+                    statusElement.className = 'err';
+                    document.getElementById('access-token-input').focus();
+                    return;
+                }
+                
+                validateBtn.disabled = true;
+                validateBtn.textContent = 'Validating...';
+                statusElement.innerHTML = 'Testing credentials...';
+                statusElement.className = 'info';
+                
+                try {
+                    const response = await fetch('/api/validate-token', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ projectId, location, accessToken })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.valid) {
+                        statusElement.innerHTML = 'Connected ✓';
+                        statusElement.className = 'ok';
+                        validateBtn.textContent = 'Connected';
+                        validateBtn.classList.add('btn-dark');
+                        validateBtn.classList.remove('btn-light');
+                        
+                        setTimeout(() => {
+                            window.location.href = '/home';
+                        }, 1000);
+                    } else {
+                        console.error('Validation result error:', result.message || 'Invalid credentials');
+                        statusElement.innerHTML = 'Authentication failed. See console.';
+                        statusElement.className = 'err';
+                        validateBtn.textContent = 'Retry Validation';
+                    }
+                } catch (error) {
+                    console.error('Validation error:', error);
+                    statusElement.innerHTML = '<span class="text-red-600 dark:text-red-400 font-bold">Connection failed</span>';
+                    validateBtn.textContent = 'Retry Validation';
+                } finally {
+                    validateBtn.disabled = false;
+                }
+            });
+
+            saveInstructionsBtn?.addEventListener('click', async () => {
+                const instructions = document.getElementById('system-instructions-input').value;
+                try {
+                    const response = await fetch('/api/set-system-instructions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ instructions })
+                    });
+                    if (response.ok) {
+                        saveInstructionsBtn.textContent = 'Saved!';
+                        setTimeout(() => { saveInstructionsBtn.textContent = 'Save Instructions'; }, 2000);
+                    }
+                } catch (error) {
+                    console.error('Save error:', error);
+                }
+            });
+        });
+
+        // ── NAVIGATION ──
+        window.goTo = function(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            const target = document.getElementById(id);
+            if(target) target.classList.add('active');
+            if (id === 'screen-voice' && window.startOrbAnim) window.startOrbAnim();
+            
+            // Re-render auth if returning to base
+            if (id === 'screen-auth') {
+                const validateBtn = document.getElementById('validate-token-btn');
+                if (validateBtn) validateBtn.textContent = 'Validate & Connect';
+            }
+        };
+
+        // ── COPY TO CLIPBOARD ──
+        window.copyToClipboard = function(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                const statusElement = document.getElementById('validation-status');
+                if (statusElement) {
+                    statusElement.innerHTML = 'Command copied to clipboard!';
+                    statusElement.className = 'info';
+                    setTimeout(() => {
+                        if (statusElement.innerHTML === 'Command copied to clipboard!') {
+                            statusElement.innerHTML = 'Waiting for credentials…';
+                            statusElement.className = '';
+                        }
+                    }, 2500);
+                }
+            }).catch(err => console.error('Copy failed', err));
+        };
+
+        // ── MODAL ──
+        window.showModal = function() {
+            document.getElementById('micModal').classList.add('visible');
+        };
+        window.hideModal = function() {
+            document.getElementById('micModal').classList.remove('visible');
+        };
+
+        // ── MIC TOGGLE ──
+        window.micOn = true;
+        window.toggleMic = function() {
+            window.micOn = !window.micOn;
+            const orb = document.getElementById('mainOrb');
+            const btn = document.getElementById('micToggle');
+            const rings = document.querySelectorAll('.orb-ring');
+            if (window.micOn) {
+                if (orb) orb.className = 'orb listening';
+                if (btn) btn.style.opacity = '1';
+                rings.forEach(r => r.style.display = 'block');
+            } else {
+                if (orb) orb.className = 'orb';
+                if (btn) btn.style.opacity = '0.4';
+                rings.forEach(r => r.style.display = 'none');
+            }
+        };
+
+        // ── ORB ANIMATION ──
+        window.startOrbAnim = function() {
+            const orb = document.getElementById('mainOrb');
+            const btn = document.getElementById('micToggle');
+            const rings = document.querySelectorAll('.orb-ring');
+            if (orb) orb.className = 'orb listening';
+            if (btn) btn.style.opacity = '1';
+            rings.forEach(r => r.style.display = 'block');
+            window.micOn = true;
+            const states = ['listening','speaking','listening'];
+            let si = 0;
+            clearInterval(window._orbTimer);
+            window._orbTimer = setInterval(() => {
+                if (!window.micOn) return;
+                si = (si + 1) % states.length;
+                if (orb) orb.className = 'orb ' + states[si];
+            }, 2800);
+        };
+
+        // ── VOICE CAROUSEL ──
+        const voices = [
+            { name: 'Breeze', tag: 'Light and clear' },
+            { name: 'Monday', tag: 'Balanced' },
+            { name: 'Juniper', tag: 'Open and upbeat' },
+            { name: 'Arbor', tag: 'Engaging and calming' },
+            { name: 'Sol', tag: 'Warm and direct' },
+            { name: 'Ember', tag: 'Deep and steady' },
+        ];
+        let vi = 2;
+
+        window.updateCarousel = function() {
+            const prev = voices[(vi - 1 + voices.length) % voices.length];
+            const cur = voices[vi];
+            const next = voices[(vi + 1) % voices.length];
+            document.getElementById('prevVoiceName').textContent = prev.name;
+            document.getElementById('prevVoiceTag').textContent = prev.tag;
+            document.getElementById('curVoiceName').textContent = cur.name;
+            document.getElementById('curVoiceTag').textContent = cur.tag;
+            document.getElementById('nextVoiceName').textContent = next.name;
+            document.getElementById('nextVoiceTag').textContent = next.tag;
+        };
+        window.nextVoice = function() { vi = (vi + 1) % voices.length; window.updateCarousel(); };
+        window.prevVoice = function() { vi = (vi - 1 + voices.length) % voices.length; window.updateCarousel(); };
+
+        // ── SELECT AVATAR ──
+        window.selectAvatar = function(idx, el) {
+            document.querySelectorAll('.vs-avatar').forEach(a => a.classList.remove('selected'));
+            el.classList.add('selected');
+        };
+    </script>
+</body>
+</html>
