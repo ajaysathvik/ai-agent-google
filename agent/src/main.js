@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { getGenMediaContent, initGenMediaChat } from './features/genmedia-chat.js';
+import { getGenMediaContent, initGenMediaChat } from './features/agent.js';
 import { showToast } from './ui.js';
 
 function initDarkMode() {
@@ -109,5 +109,5 @@ if (document.readyState === 'loading') {
     initKeyboardShortcuts();
 }
 
-window.GenMediaLive = { version: '1.0.0', name: 'GenMedia Live' };
+window.SupportBotLive = { version: '1.0.0', name: 'Support Bot Live' };
 export { initApp };

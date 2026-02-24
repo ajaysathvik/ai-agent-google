@@ -1,18 +1,18 @@
-# GenMedia Live — Real-Time AI Voice Agent
+# Support Bot Live — Real-Time AI Voice Agent
 
-**A real-time voice and vision agent powered by the Gemini Live API.**
+**A real-time voice and vision support agent powered by the Gemini Live API.**
 
-GenMedia Live is a Live Agent that users can talk to naturally, with support for interruptions, camera/screen vision, and text input. Built on the Gemini Live API (`gemini-live-2.5-flash-native-audio`) and hosted on Google Cloud, it enables real-time multimodal interaction — from acting as a real-time translator, to a vision-enabled tutor that "sees" your homework, to a customer support agent.
+Support Bot Live is a Live Agent that users can talk to naturally, with support for interruptions, camera/screen vision, and text input. Built on the Gemini Live API (`gemini-live-2.5-flash-native-audio`) and hosted on Google Cloud, it enables real-time multimodal interaction — from customer support to live assistance with visual context.
 
 ---
 
 ## Features
 
 - **Real-Time Voice Chat**: Natural, low-latency voice conversations via the Gemini Live API. Handles user interruptions gracefully — the model stops speaking when you start talking.
-- **Vision (Camera)**: Share your camera so the AI can see your environment in real-time — show a menu, a street sign, homework, or a product for context-aware conversation.
+- **Vision (Camera)**: Share your camera so the AI can see your environment in real-time — show a product, document, or issue for context-aware support.
 - **Screen Share**: Share your screen for the AI to reference during conversation.
 - **Text Input**: Type messages as an alternative to voice.
-- **Customizable System Instructions**: Tailor the agent's persona and behavior for any use case (tutor, translator, support agent, etc.).
+- **Customizable System Instructions**: Tailor the agent's persona and behavior for any use case.
 - **Voice Selection**: Choose from multiple AI voice options (Aoede, Breeze, Juniper, etc.).
 - **Session Management**: Automatic reconnection and persistent session handling.
 
@@ -82,7 +82,7 @@ GenMedia Live is a Live Agent that users can talk to naturally, with support for
 1. Clone the repository:
 ```bash
 git clone <your-repo-url>
-cd genmedia-live
+cd agent
 ```
 
 2. Create and activate virtual environment:
@@ -124,13 +124,13 @@ python app.py
 
 ```bash
 # Build
-docker build -t genmedia-live .
+docker build -t support-bot-live .
 
 # Run locally
-docker run -p 8080:8080 genmedia-live
+docker run -p 8080:8080 support-bot-live
 
 # Deploy to Cloud Run
-gcloud run deploy genmedia-live \
+gcloud run deploy support-bot-live \
   --source . \
   --region us-central1 \
   --allow-unauthenticated
@@ -143,7 +143,7 @@ gcloud run deploy genmedia-live \
 - **Native Audio model**: The `gemini-live-2.5-flash-native-audio` model provides natural-sounding voice with very low latency, making conversations feel fluid and real.
 - **Interruption handling**: The Live API handles user interruptions natively — no explicit logic needed. The model stops speaking when the user starts talking, which is critical for a natural conversational feel.
 - **PCM audio streaming**: Sending raw PCM (16kHz int16) and receiving PCM (24kHz) via base64 over Socket.IO works reliably. The Web Audio API `ScriptProcessorNode` is simple for mic capture.
-- **Visual grounding**: Sending camera frames as JPEG blobs enriches conversation significantly — the model can discuss what it sees in real-time, enabling use cases like tutoring with homework or translating signs.
+- **Visual grounding**: Sending camera frames as JPEG blobs enriches conversation significantly — the model can discuss what it sees in real-time, enabling use cases like showing a product issue or sharing a document for support.
 - **Session management**: The Live API sessions have time limits, requiring reconnection logic. The `SessionBridge` pattern with asyncio queues handles the thread boundary between Flask-SocketIO and async Gemini sessions cleanly.
 - **Polling transport**: Using Socket.IO with `polling` (not WebSocket) avoids issues with proxies and Cloud Run's request model.
 

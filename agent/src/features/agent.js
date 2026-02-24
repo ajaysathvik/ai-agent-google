@@ -20,8 +20,8 @@ let socket = null;
 let audioContext = null;
 let audioWorklet = null;
 let mediaStream = null;
-let sessionId = localStorage.getItem('genmedia_session_id') || `session-${Date.now()}`;
-localStorage.setItem('genmedia_session_id', sessionId);
+let sessionId = localStorage.getItem('support_bot_session_id') || `session-${Date.now()}`;
+localStorage.setItem('support_bot_session_id', sessionId);
 
 let isRecording = false;
 let isConnected = false;
@@ -60,7 +60,7 @@ function clearSessionState() {
 
 export async function getGenMediaContent() {
     try {
-        const response = await fetch('/src/features/templates/genmedia-chat.html');
+        const response = await fetch('/src/features/templates/Support Bot Live.html');
         if (!response.ok) throw new Error(`Failed to load template: ${response.status}`);
         return await response.text();
     } catch (error) {
@@ -270,9 +270,9 @@ async function clearAllData() {
         uploadedImages = [];
         removeUploadedImage();
 
-        localStorage.removeItem('genmedia_session_id');
+        localStorage.removeItem('support_bot_session_id');
         sessionId = `session-${Date.now()}`;
-        localStorage.setItem('genmedia_session_id', sessionId);
+        localStorage.setItem('support_bot_session_id', sessionId);
 
         if (messagesContainer) {
             messagesContainer.innerHTML = `

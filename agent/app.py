@@ -1,4 +1,4 @@
-"""GenMedia Live - Real-time AI voice and vision agent."""
+"""Support Bot Live - Real-time AI voice and vision agent."""
 
 import asyncio
 import base64
