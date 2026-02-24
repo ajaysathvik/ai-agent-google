@@ -1,3 +1,0 @@
-gcloud auth login
-gcloud config set project live-agent-488118
-gcloud auth print-access-token
