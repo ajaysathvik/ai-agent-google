@@ -132,6 +132,8 @@ async def run_live_session(session_id, sid):
                         prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Aoede")
                     )
                 ),
+                input_audio_transcription=types.AudioTranscriptionConfig(),
+                output_audio_transcription=types.AudioTranscriptionConfig(),
             )
 
             client = get_active_client()
@@ -184,13 +186,42 @@ async def run_live_session(session_id, sid):
                                 if response.server_content and response.server_content.model_turn:
                                     for part in response.server_content.model_turn.parts:
                                         if part.text:
+                                            logging.info(f"[TRANSCRIPTION] Output: {part.text}")
                                             socketio.emit("text_response", {"text": part.text}, room=current_sid)
                                         if part.inline_data:
+                                            logging.info(f"[AUDIO] Sending audio chunk ({len(part.inline_data.data)} bytes)")
                                             audio_b64 = base64.b64encode(part.inline_data.data).decode("utf-8")
                                             socketio.emit("audio_response", {
                                                 "audio": audio_b64,
                                                 "mime_type": part.inline_data.mime_type,
                                             }, room=current_sid)
+
+                                # Handle input audio transcription (what the user said)
+                                if response.server_content and response.server_content.input_transcription:
+                                    transcript = response.server_content.input_transcription.text
+                                    logging.info(f"[TRANSCRIPTION] Input: {transcript}")
+                                    if transcript:
+                                        socketio.emit("input_transcription", {"text": transcript}, room=current_sid)
+
+                                # Log the raw server_content keys for debugging
+                                if response.server_content:
+                                    sc = response.server_content
+                                    has_model_turn = sc.model_turn is not None
+                                    has_input_transcription = hasattr(sc, 'input_transcription') and sc.input_transcription is not None
+                                    has_output_transcription = hasattr(sc, 'output_transcription') and sc.output_transcription is not None
+                                    has_turn_complete = sc.turn_complete
+                                    if has_model_turn or has_input_transcription or has_output_transcription or has_turn_complete:
+                                        logging.info(f"[SERVER_CONTENT] model_turn={has_model_turn}, input_transcription={has_input_transcription}, output_transcription={has_output_transcription}, turn_complete={has_turn_complete}")
+
+                                    # Clear transcript on turn completion so old text disappears
+                                    if has_turn_complete:
+                                        socketio.emit("clear_transcript", room=current_sid)
+
+                                    # Also check output_transcription if it exists separately
+                                    if has_output_transcription:
+                                        logging.info(f"[TRANSCRIPTION] Output (via output_transcription): {sc.output_transcription.text}")
+                                        if sc.output_transcription.text:
+                                            socketio.emit("text_response", {"text": sc.output_transcription.text}, room=current_sid)
                     except asyncio.CancelledError:
                         return "cancelled"
                     except Exception as e:
@@ -407,7 +438,7 @@ def serve_src_files(filename):
     return send_from_directory("src", filename)
 
 @app.route("/style.css")
-def serve_style():
+def serve_style(): 
     if Path("style.css").exists():
         return send_from_directory(".", "style.css")
     return "", 200

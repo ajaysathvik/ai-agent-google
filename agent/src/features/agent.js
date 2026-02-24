@@ -345,6 +345,7 @@ function initSocket() {
         sessionStartPending = false;
         updateConnectionStatus('Live', 'active');
         if (data.user_name) currentUserName = data.user_name;
+        clearTranscript();
     });
 
     socket.on('live_session_ended', () => {
@@ -365,6 +366,18 @@ function initSocket() {
     });
 
     socket.on('audio_response', playAudioResponse);
+
+    socket.on('text_response', (data) => {
+        if (data.text) appendTranscript(data.text);
+    });
+
+    socket.on('input_transcription', (data) => {
+        // Input transcription received but not displayed
+    });
+
+    socket.on('clear_transcript', () => {
+        clearTranscript();
+    });
 
 
     socket.on('session_ended_reconnect', () => {
@@ -744,4 +757,45 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function appendTranscript(text) {
+    const container = document.getElementById('transcriptContainer');
+    const content = document.getElementById('transcriptContent');
+    if (!content) return;
+
+    // If text is overflowing, clear old chunks immediately
+    if (container && content.scrollHeight > container.clientHeight) {
+        content.innerHTML = '';
+    }
+
+    const span = document.createElement('span');
+    span.className = 'transcript-chunk';
+    span.textContent = '';
+    content.appendChild(span);
+
+    // Stream character by character
+    let i = 0;
+    const charDelay = 50; // ms per character, slower pace
+    const streamInterval = setInterval(() => {
+        if (i < text.length) {
+            span.textContent += text[i];
+            i++;
+            if (container) container.scrollTop = container.scrollHeight;
+        } else {
+            clearInterval(streamInterval);
+            // Auto-fade after 800ms once fully typed, then remove
+            setTimeout(() => {
+                span.classList.add('fading');
+                setTimeout(() => {
+                    if (span.parentNode) span.parentNode.removeChild(span);
+                }, 400);
+            }, 800);
+        }
+    }, charDelay);
+}
+
+function clearTranscript() {
+    const content = document.getElementById('transcriptContent');
+    if (content) content.innerHTML = '';
 }
