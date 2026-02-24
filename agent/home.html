@@ -23,12 +23,9 @@
   </nav>
 
   <div class="main-content" style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; height: calc(100vh - 52px);">
-    <button class="mic-btn-main" onclick="goTo('screen-voice'); document.getElementById('voice-button').click();" style="width: 80px; height: 80px; transition: transform 0.2s;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" style="width: 32px; height: 32px;">
-        <rect x="9" y="2" width="6" height="12" rx="3"/>
-        <path d="M5 10a7 7 0 0 0 14 0"/>
-        <line x1="12" y1="19" x2="12" y2="22"/>
-        <line x1="8" y1="22" x2="16" y2="22"/>
+    <button class="mic-btn-main" onclick="goTo('screen-voice'); document.getElementById('voice-button').click();">
+      <svg viewBox="0 0 28 28" fill="white" style="width: 32px; height: 32px;">
+        <path d="M14 0 L16.5 9.5 L24 6 L18.5 13.5 L28 14 L18.5 16.5 L24 22 L16.5 18.5 L14 28 L11.5 18.5 L4 22 L9.5 16.5 L0 14 L9.5 13.5 L4 6 L11.5 9.5 Z"/>
       </svg>
     </button>
     <button id="voice-button" style="display:none;"></button>
@@ -58,12 +55,17 @@
     </div>
   </div>
 
-  <div class="voice-main">
+  <div class="voice-main" id="voiceMain">
     <div class="orb-container">
       <div class="orb-ring"></div>
       <div class="orb-ring"></div>
       <div class="orb-ring"></div>
       <div class="orb listening" id="mainOrb"></div>
+    </div>
+
+    <!-- Video preview (shown when camera is active) -->
+    <div class="video-preview-container" id="videoPreview">
+      <video id="voiceCameraVideo" autoplay playsinline muted></video>
     </div>
 
     <div class="transcript-container" id="transcriptContainer">
@@ -98,7 +100,13 @@
           <line x1="8" y1="22" x2="16" y2="22"/>
         </svg>
       </button>
-      <button class="vc-close-btn" onclick="document.getElementById('voice-button').click(); goTo('screen-main');">✕</button>
+      <button class="vc-camera-btn" id="cameraToggle" onclick="toggleCameraVoice()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 7l-7 5 7 5V7z"/>
+          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+        </svg>
+      </button>
+      <button class="vc-close-btn" onclick="stopCameraVoice(); document.getElementById('voice-button').click(); goTo('screen-main');">✕</button>
     </div>
   </div>
 
@@ -246,6 +254,74 @@
   function selectAvatar(idx, el) {
     document.querySelectorAll('.vs-avatar').forEach(a => a.classList.remove('selected'));
     el.classList.add('selected');
+  }
+
+  // ── CAMERA IN VOICE MODE ──
+  let voiceCameraStream = null;
+  let voiceCameraInterval = null;
+  let voiceCameraProcessing = false;
+
+  function toggleCameraVoice() {
+    if (voiceCameraStream) stopCameraVoice();
+    else startCameraVoice();
+  }
+
+  async function startCameraVoice() {
+    try {
+      voiceCameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: 768, height: 768 } });
+      const videoEl = document.getElementById('voiceCameraVideo');
+      videoEl.srcObject = voiceCameraStream;
+
+      // Show video, hide orb
+      document.getElementById('videoPreview').classList.add('active');
+      document.getElementById('voiceMain').classList.add('camera-active');
+      document.getElementById('cameraToggle').classList.add('active');
+
+      // Send frames at 1 FPS
+      voiceCameraInterval = setInterval(() => sendVoiceCameraFrame(videoEl), 1000);
+    } catch (err) {
+      console.error('Camera error:', err);
+    }
+  }
+
+  function stopCameraVoice() {
+    if (voiceCameraInterval) { clearInterval(voiceCameraInterval); voiceCameraInterval = null; }
+    if (voiceCameraStream) { voiceCameraStream.getTracks().forEach(t => t.stop()); voiceCameraStream = null; }
+    const videoEl = document.getElementById('voiceCameraVideo');
+    if (videoEl) videoEl.srcObject = null;
+
+    document.getElementById('videoPreview').classList.remove('active');
+    document.getElementById('voiceMain').classList.remove('camera-active');
+    document.getElementById('cameraToggle').classList.remove('active');
+  }
+
+  function sendVoiceCameraFrame(videoEl) {
+    if (!videoEl || !voiceCameraStream || voiceCameraProcessing) return;
+    voiceCameraProcessing = true;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 768; canvas.height = 768;
+    const ctx = canvas.getContext('2d');
+    const ar = videoEl.videoWidth / videoEl.videoHeight;
+    let dw = 768, dh = 768, ox = 0, oy = 0;
+    if (ar > 1) { dh = 768/ar; oy = (768-dh)/2; } else { dw = 768*ar; ox = (768-dw)/2; }
+    ctx.drawImage(videoEl, ox, oy, dw, dh);
+
+    canvas.toBlob((blob) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result.split(',')[1];
+        // Use the socket from agent.js via the global
+        if (window._agentSocket) {
+          window._agentSocket.emit('send_camera_frame', {
+            session_id: localStorage.getItem('support_bot_session_id') || 'default',
+            frame: base64
+          });
+        }
+        setTimeout(() => { voiceCameraProcessing = false; }, 50);
+      };
+      reader.readAsDataURL(blob);
+    }, 'image/jpeg', 0.6);
   }
 </script>
 

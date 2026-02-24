@@ -320,6 +320,9 @@ function initSocket() {
         timeout: 60000
     });
 
+    // Expose socket globally for camera frame sending from voice mode
+    window._agentSocket = socket;
+
     socket.on('connect', () => {
         updateConnectionStatus('Ready', 'success');
         socket.emit('check_session_status', { session_id: sessionId }, (response) => {

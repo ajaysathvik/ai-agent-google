@@ -126,7 +126,7 @@ async def run_live_session(session_id, sid):
             config = types.LiveConnectConfig(
                 response_modalities=["AUDIO"],
                 system_instruction=get_live_system_prompt(),
-                media_resolution=types.MediaResolution.MEDIA_RESOLUTION_MEDIUM,
+                media_resolution=types.MediaResolution.MEDIA_RESOLUTION_HIGH,
                 speech_config=types.SpeechConfig(
                     voice_config=types.VoiceConfig(
                         prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Aoede")
@@ -134,6 +134,7 @@ async def run_live_session(session_id, sid):
                 ),
                 input_audio_transcription=types.AudioTranscriptionConfig(),
                 output_audio_transcription=types.AudioTranscriptionConfig(),
+                enable_affective_dialog=True,
             )
 
             client = get_active_client()
