@@ -2,6 +2,7 @@
 
 import asyncio
 import base64
+import json
 import logging
 import os
 import threading
@@ -50,8 +51,50 @@ live_sessions = {}
 starting_sessions = set()
 starting_session_sids = {}
 session_states = {}
+session_resumption_handles = {}  # session_id -> handle string
 user_name = "User"
 custom_system_instructions = "You are a helpful real-time AI assistant."
+
+# Data directory for session persistence
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(exist_ok=True)
+
+def save_session_handle(session_id, handle):
+    """Save a session resumption handle to disk."""
+    session_resumption_handles[session_id] = handle
+    handle_file = DATA_DIR / f"{session_id}_handle.json"
+    try:
+        handle_file.write_text(json.dumps({"session_id": session_id, "handle": handle}))
+        logging.info(f"[SESSION] Saved resumption handle for {session_id}")
+    except Exception as e:
+        logging.error(f"[SESSION] Failed to save handle: {e}")
+
+def load_session_handle(session_id):
+    """Load a session resumption handle from disk."""
+    if session_id in session_resumption_handles:
+        return session_resumption_handles[session_id]
+    handle_file = DATA_DIR / f"{session_id}_handle.json"
+    if handle_file.exists():
+        try:
+            data = json.loads(handle_file.read_text())
+            handle = data.get("handle")
+            if handle:
+                session_resumption_handles[session_id] = handle
+                logging.info(f"[SESSION] Loaded resumption handle for {session_id}")
+                return handle
+        except Exception as e:
+            logging.error(f"[SESSION] Failed to load handle: {e}")
+    return None
+
+def clear_session_handle(session_id):
+    """Remove a stored session handle."""
+    session_resumption_handles.pop(session_id, None)
+    handle_file = DATA_DIR / f"{session_id}_handle.json"
+    if handle_file.exists():
+        try:
+            handle_file.unlink()
+        except Exception:
+            pass
 
 def get_session_state(session_id):
     if session_id not in session_states:
@@ -123,6 +166,15 @@ async def run_live_session(session_id, sid):
         bridges[session_id] = bridge
 
         try:
+            # Check for a stored resumption handle
+            stored_handle = load_session_handle(session_id)
+            if stored_handle:
+                logging.info(f"[SESSION] Using resumption handle for {session_id} (reconnect #{reconnect_count})")
+            resumption_config = types.SessionResumptionConfig(
+                handle=stored_handle,
+                transparent=True,
+            )
+
             config = types.LiveConnectConfig(
                 response_modalities=["AUDIO"],
                 system_instruction=get_live_system_prompt(),
@@ -135,6 +187,7 @@ async def run_live_session(session_id, sid):
                 input_audio_transcription=types.AudioTranscriptionConfig(),
                 output_audio_transcription=types.AudioTranscriptionConfig(),
                 enable_affective_dialog=True,
+                session_resumption=resumption_config,
             )
 
             client = get_active_client()
@@ -183,6 +236,13 @@ async def run_live_session(session_id, sid):
                                 if not live_sessions.get(session_id, {}).get("active"):
                                     return "ended"
                                 current_sid = live_sessions[session_id]["sid"]
+
+                                # Handle session resumption updates
+                                if hasattr(response, 'session_resumption_update') and response.session_resumption_update:
+                                    update = response.session_resumption_update
+                                    if update.resumable and update.new_handle:
+                                        save_session_handle(session_id, update.new_handle)
+                                        logging.info(f"[SESSION] ✅ Resumption handle updated for {session_id}")
 
                                 if response.server_content and response.server_content.model_turn:
                                     for part in response.server_content.model_turn.parts:
@@ -258,10 +318,14 @@ async def run_live_session(session_id, sid):
 
     if session_id in bridges:
         del bridges[session_id]
+    has_handle = load_session_handle(session_id) is not None
     if session_id in live_sessions:
         final_sid = live_sessions[session_id]["sid"]
         del live_sessions[session_id]
-        socketio.emit("session_ended_reconnect", {"session_id": session_id, "can_resume": False}, room=final_sid)
+        socketio.emit("session_ended_reconnect", {
+            "session_id": session_id,
+            "can_resume": has_handle,
+        }, room=final_sid)
     starting_sessions.discard(session_id)
 
 
@@ -425,6 +489,16 @@ def set_system_instructions():
 @app.route("/api/list-files", methods=["GET"])
 def api_list_files():
     return jsonify({"files": []})
+
+@app.route("/api/clear-session-handle", methods=["POST"])
+def api_clear_session_handle():
+    data = request.json
+    session_id = data.get("session_id")
+    if session_id:
+        clear_session_handle(session_id)
+        logging.info(f"[SESSION] Cleared handle for {session_id} (new session requested)")
+        return jsonify({"success": True})
+    return jsonify({"success": False, "error": "No session_id provided"})
 
 @app.route("/")
 def serve_home():

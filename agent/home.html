@@ -40,6 +40,13 @@
 
   <div class="voice-nav">
     <div class="voice-nav-right">
+      <button class="v-icon-btn" onclick="startNewSession()" title="New Session">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M23 4v6h-6"/>
+          <path d="M1 20v-6h6"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+      </button>
       <button class="v-icon-btn" onclick="showModal()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
           <circle cx="12" cy="12" r="9"/>
@@ -254,6 +261,42 @@
   function selectAvatar(idx, el) {
     document.querySelectorAll('.vs-avatar').forEach(a => a.classList.remove('selected'));
     el.classList.add('selected');
+  }
+
+  // ── NEW SESSION ──
+  async function startNewSession() {
+    const oldSessionId = localStorage.getItem('support_bot_session_id') || 'default';
+
+    // Stop current session
+    if (window._agentSocket) {
+      window._agentSocket.emit('stop_live_session', { session_id: oldSessionId });
+    }
+
+    // Clear stored handle on server
+    try {
+      await fetch('/api/clear-session-handle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: oldSessionId })
+      });
+    } catch (e) { console.error('Clear handle error:', e); }
+
+    // Generate new session ID
+    const newSessionId = 'session-' + Date.now();
+    localStorage.setItem('support_bot_session_id', newSessionId);
+
+    // Restart: click mic to stop, then click again to start fresh
+    const micToggle = document.getElementById('micToggle');
+    if (micOn) {
+      document.getElementById('voice-button').click();
+      toggleMic();
+    }
+
+    // Brief delay then start new session
+    setTimeout(() => {
+      document.getElementById('voice-button').click();
+      if (!micOn) toggleMic();
+    }, 600);
   }
 
   // ── CAMERA IN VOICE MODE ──
