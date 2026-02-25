@@ -1,4 +1,4 @@
-"""Support Bot Live - Real-time AI voice and vision agent."""
+"""Live Cultural Context Agent - Point your camera at a landmark and have a conversation about it."""
 
 import asyncio
 import base64
@@ -54,7 +54,7 @@ starting_session_sids = {}
 session_states = {}
 session_resumption_handles = {}  # session_id -> handle string
 user_name = "User"
-custom_system_instructions = "You are a helpful real-time AI assistant."
+custom_system_instructions = "You are a live cultural context agent — a passionate and knowledgeable guide who identifies landmarks through the user's camera and shares rich historical and cultural stories about them."
 
 # Data directory for session persistence
 DATA_DIR = Path("data")
@@ -142,11 +142,7 @@ def get_live_system_prompt():
     custom = f"\n{custom_system_instructions}\n" if custom_system_instructions else ""
     name_section = f"\nUser's name: {user_name}\n" if user_name and user_name != "User" else ""
     context_section = f"\n--- GROUNDING CONTEXT ---\n{GROUNDING_CONTEXT}\n--- END CONTEXT ---\n" if GROUNDING_CONTEXT else ""
-    return f"""You are a Real-Time AI Voice Agent for Amrita Hospital.
-
-IMPORTANT: You MUST begin every new conversation by saying EXACTLY:
-"Namah Shivaya. Welcome to Amrita Hospital. I am your health assistant. How can I help you or your loved ones today?"
-Do NOT skip or modify this greeting. Always start with it before anything else.
+    return f"""You are a Real-Time AI Voice Agent.
 
 {custom}{name_section}{context_section}
 You support real-time voice interaction and can be interrupted naturally.

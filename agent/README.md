@@ -1,19 +1,21 @@
-# Support Bot Live — Real-Time AI Voice Agent
+# Live Cultural Context Agent — Point, See, Discover
 
-**A real-time voice and vision support agent powered by the Gemini Live API.**
+**A real-time voice and vision agent that brings landmarks to life through conversation.**
 
-Support Bot Live is a Live Agent that users can talk to naturally, with support for interruptions, camera/screen vision, and text input. Built on the Gemini Live API (`gemini-live-2.5-flash-native-audio`) and hosted on Google Cloud, it enables real-time multimodal interaction — from customer support to live assistance with visual context.
+Live Cultural Context Agent lets you point your camera at any landmark, monument, or point of interest and have a natural voice conversation about it. Powered by the Gemini Live API (`gemini-live-2.5-flash-native-audio`) and hosted on Google Cloud, it acts as a passionate cultural guide who can see what you see — identifying landmarks in real-time, sharing rich historical narratives, and answering your questions naturally.
 
 ---
 
 ## Features
 
-- **Real-Time Voice Chat**: Natural, low-latency voice conversations via the Gemini Live API. Handles user interruptions gracefully — the model stops speaking when you start talking.
-- **Vision (Camera)**: Share your camera so the AI can see your environment in real-time — show a product, document, or issue for context-aware support.
-- **Screen Share**: Share your screen for the AI to reference during conversation.
+- **Real-Time Landmark Recognition**: Point your camera at any landmark and the AI identifies it instantly, providing cultural and historical context without being asked.
+- **Natural Voice Conversations**: Talk naturally about what you're seeing — ask follow-up questions, request deeper history, or explore cultural connections. The AI handles interruptions gracefully.
+- **Visual Exploration Guidance**: The agent proactively points out architectural details, inscriptions, and hidden features you might otherwise miss.
+- **Cultural Storytelling**: Go beyond Wikipedia facts — hear the stories behind the stones, the people who built them, and why they matter today.
+- **Multilingual Awareness**: Inscriptions and signs in other languages are translated and explained in context.
+- **Screen Share**: Share your screen to discuss photos, maps, or articles about places you're planning to visit.
 - **Text Input**: Type messages as an alternative to voice.
-- **Customizable System Instructions**: Tailor the agent's persona and behavior for any use case.
-- **Voice Selection**: Choose from multiple AI voice options (Aoede, Breeze, Juniper, etc.).
+- **Customizable Persona**: Tailor the agent's focus — art history, architecture, local cuisine, or general cultural exploration.
 - **Session Management**: Automatic reconnection and persistent session handling.
 
 ---
@@ -124,13 +126,13 @@ python app.py
 
 ```bash
 # Build
-docker build -t support-bot-live .
+docker build -t cultural-context-agent .
 
 # Run locally
-docker run -p 8080:8080 support-bot-live
+docker run -p 8080:8080 cultural-context-agent
 
 # Deploy to Cloud Run
-gcloud run deploy support-bot-live \
+gcloud run deploy cultural-context-agent \
   --source . \
   --region us-central1 \
   --allow-unauthenticated
@@ -140,11 +142,12 @@ gcloud run deploy support-bot-live \
 
 ## Findings & Learnings
 
-- **Native Audio model**: The `gemini-live-2.5-flash-native-audio` model provides natural-sounding voice with very low latency, making conversations feel fluid and real.
-- **Interruption handling**: The Live API handles user interruptions natively — no explicit logic needed. The model stops speaking when the user starts talking, which is critical for a natural conversational feel.
+- **Native Audio model**: The `gemini-live-2.5-flash-native-audio` model provides natural-sounding voice with very low latency, making conversations feel fluid and real — essential for a walking-tour experience.
+- **Visual grounding for landmarks**: Sending camera frames as JPEG blobs enables the model to identify and discuss landmarks in real-time. The model recognizes architectural styles, inscriptions, and cultural artifacts with impressive accuracy.
+- **Interruption handling**: The Live API handles user interruptions natively — no explicit logic needed. The model stops speaking when the user starts talking, which is critical for a natural conversational guide experience.
 - **PCM audio streaming**: Sending raw PCM (16kHz int16) and receiving PCM (24kHz) via base64 over Socket.IO works reliably. The Web Audio API `ScriptProcessorNode` is simple for mic capture.
-- **Visual grounding**: Sending camera frames as JPEG blobs enriches conversation significantly — the model can discuss what it sees in real-time, enabling use cases like showing a product issue or sharing a document for support.
 - **Session management**: The Live API sessions have time limits, requiring reconnection logic. The `SessionBridge` pattern with asyncio queues handles the thread boundary between Flask-SocketIO and async Gemini sessions cleanly.
+- **Contextual depth via system prompt**: A well-crafted system prompt transforms the model from a generic assistant into a passionate cultural guide. Including instructions for proactive identification, storytelling tone, and cultural sensitivity significantly improves the user experience.
 - **Polling transport**: Using Socket.IO with `polling` (not WebSocket) avoids issues with proxies and Cloud Run's request model.
 
 ---

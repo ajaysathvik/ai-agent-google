@@ -60,7 +60,7 @@ function clearSessionState() {
 
 export async function getGenMediaContent() {
     try {
-        const response = await fetch('/src/features/templates/Support Bot Live.html');
+        const response = await fetch('/src/features/templates/Cultural Context Agent.html');
         if (!response.ok) throw new Error(`Failed to load template: ${response.status}`);
         return await response.text();
     } catch (error) {
