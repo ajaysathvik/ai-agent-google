@@ -109,5 +109,5 @@ if (document.readyState === 'loading') {
     initKeyboardShortcuts();
 }
 
-window.SupportBotLive = { version: '1.0.0', name: 'Support Bot Live' };
+window.CulturalContextAgent = { version: '1.0.0', name: 'Cultural Context Agent' };
 export { initApp };

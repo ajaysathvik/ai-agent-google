@@ -1,9 +1,10 @@
-"""Support Bot Live - Real-time AI voice and vision agent."""
+"""Live Cultural Context Agent - Point your camera at a landmark and have a conversation about it."""
 
 import asyncio
 import base64
 import json
 import logging
+from datetime import datetime
 import os
 import threading
 import traceback
@@ -53,11 +54,21 @@ starting_session_sids = {}
 session_states = {}
 session_resumption_handles = {}  # session_id -> handle string
 user_name = "User"
-custom_system_instructions = "You are a helpful real-time AI assistant."
+custom_system_instructions = "You are a live cultural context agent — a passionate and knowledgeable guide who identifies landmarks through the user's camera and shares rich historical and cultural stories about them."
 
 # Data directory for session persistence
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
+
+def save_transcript(session_id, role, text):
+    """Append a transcript line to a session's transcript file in the data folder."""
+    transcript_file = DATA_DIR / f"transcript_{session_id}.txt"
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        with open(transcript_file, "a", encoding="utf-8") as f:
+            f.write(f"[{timestamp}] {role}: {text}\n")
+    except Exception as e:
+        logging.error(f"[TRANSCRIPT] Failed to save: {e}")
 
 def save_session_handle(session_id, handle):
     """Save a session resumption handle to disk."""
@@ -118,15 +129,25 @@ def get_active_client():
             logging.error(f"Failed to use default credentials: {e}")
             return None
 
+# Load grounding context from context.txt
+GROUNDING_CONTEXT = ""
+_context_file = Path("context.txt")
+if _context_file.exists():
+    GROUNDING_CONTEXT = _context_file.read_text().strip()
+    logging.info(f"[CONTEXT] Loaded grounding context ({len(GROUNDING_CONTEXT)} chars)")
+else:
+    logging.warning("[CONTEXT] context.txt not found, no grounding context loaded")
+
 def get_live_system_prompt():
     custom = f"\n{custom_system_instructions}\n" if custom_system_instructions else ""
     name_section = f"\nUser's name: {user_name}\n" if user_name and user_name != "User" else ""
-    return f"""You are a Real-Time AI Voice Agent. You can assist with any task through natural conversation.
-{custom}{name_section}
+    context_section = f"\n--- GROUNDING CONTEXT ---\n{GROUNDING_CONTEXT}\n--- END CONTEXT ---\n" if GROUNDING_CONTEXT else ""
+    return f"""You are a Real-Time AI Voice Agent.
 
+{custom}{name_section}{context_section}
 You support real-time voice interaction and can be interrupted naturally.
 If the user uploads an image or shares their camera, use that visual context to help them (e.g., explain what you see, answer questions about it, translate text in images, tutor based on homework shown, etc.).
-Keep responses concise, natural, and conversational. Adapt your persona to whatever the user needs — translator, tutor, assistant, or anything else.
+Keep responses concise, natural, and conversational.
 """
 
 class SessionBridge:
@@ -178,15 +199,23 @@ async def run_live_session(session_id, sid):
             config = types.LiveConnectConfig(
                 response_modalities=["AUDIO"],
                 system_instruction=get_live_system_prompt(),
-                media_resolution=types.MediaResolution.MEDIA_RESOLUTION_HIGH,
+                media_resolution=types.MediaResolution.MEDIA_RESOLUTION_MEDIUM,
                 speech_config=types.SpeechConfig(
                     voice_config=types.VoiceConfig(
                         prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Aoede")
                     )
                 ),
+                realtime_input_config=types.RealtimeInputConfig(
+                    automatic_activity_detection=types.AutomaticActivityDetection(
+                        disabled=False,
+                        start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_LOW,
+                        end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_LOW,
+                        prefix_padding_ms=20,
+                        silence_duration_ms=100,
+                    )
+                ),
                 input_audio_transcription=types.AudioTranscriptionConfig(),
                 output_audio_transcription=types.AudioTranscriptionConfig(),
-                enable_affective_dialog=True,
                 session_resumption=resumption_config,
             )
 
@@ -263,6 +292,7 @@ async def run_live_session(session_id, sid):
                                     logging.info(f"[TRANSCRIPTION] Input: {transcript}")
                                     if transcript:
                                         socketio.emit("input_transcription", {"text": transcript}, room=current_sid)
+                                        save_transcript(session_id, "User", transcript)
 
                                 # Log the raw server_content keys for debugging
                                 if response.server_content:
@@ -283,6 +313,7 @@ async def run_live_session(session_id, sid):
                                         logging.info(f"[TRANSCRIPTION] Output (via output_transcription): {sc.output_transcription.text}")
                                         if sc.output_transcription.text:
                                             socketio.emit("text_response", {"text": sc.output_transcription.text}, room=current_sid)
+                                            save_transcript(session_id, "Assistant", sc.output_transcription.text)
                     except asyncio.CancelledError:
                         return "cancelled"
                     except Exception as e:
